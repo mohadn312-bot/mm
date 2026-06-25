@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بوابة الموظف - إدارة العُهدة والمصروفات</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e2e;
+            color: #cdd6f4;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 650px;
+            margin: 20px auto;
+        }
+        h1, h2 { color: #89b4fa; text-align: center; }
+        .card {
+            background-color: #313244;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        input, select {
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #45475a;
+            background-color: #1e1e2e;
+            color: #cdd6f4;
+            font-size: 16px;
+        }
+        button {
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            background-color: #89b4fa;
+            color: #11111b;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        button:hover { background-color: #b4befe; }
+        .balance-box {
+            background-color: #45475a;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 20px;
+            margin-bottom: 20px;
+        }
+        .balance-amount {
+            font-size: 32px;
+            font-weight: bold;
+            color: #a6e3a1;
+            margin-top: 10px;
+        }
+        .hidden { display: none; }
+        .logout-btn { background-color: #f38ba8; margin-top: 10px;}
+        .logout-btn:hover { background-color: #eba0ac; }
+        
+        .btn-whatsapp {
+            background-color: #25D366;
+            color: white;
+            text-decoration: none;
+            text-align: center;
+            padding: 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            display: none;
+            margin-top: 10px;
+        }
+        .btn-whatsapp:hover { background-color: #128C7E; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 10px; text-align: right; border-bottom: 1px solid #45475a; font-size: 14px; }
+        th { background-color: #45475a; color: #89b4fa; }
+        .total-row { background-color: #45475a; font-weight: bold; font-size: 16px; }
+        .total-amount { color: #a6e3a1; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <!-- نموذج تسجيل الدخول -->
+    <div id="loginSection" class="card">
+        <h1>تسجيل دخول الموظف 👤</h1>
+        <div class="form-group">
+            <input type="text" id="loginName" placeholder="اسم المستخدم">
+            <input type="password" id="loginPass" placeholder="كلمة المرور">
+            <button onclick="login()">دخول</button>
+        </div>
+    </div>
+
+    <!-- لوحة الموظف بعد الدخول -->
+    <div id="dashboardSection" class="card hidden">
+        <h1 id="welcomeMessage">مرحباً</h1>
+        
+        <div class="balance-box">
+            <div>رصيد العُهدة الحالي:</div>
+            <div id="currentBalance" class="balance-amount">0</div>
+        </div>
+
+        <h2>تسجيل بيان صرف جديد 💸</h2>
+        <div class="form-group">
+            <select id="expenseCategory">
+                <option value="بنزين ومواصلات">بنزين ومواصلات 🚗</option>
+                <option value="أدوات مكتبية">أدوات مكتبية 📝</option>
+                <option value="صيانة وإصلاحات">صيانة وإصلاحات 🔧</option>
+                <option value="ضيافة وطعام">ضيافة وطعام 🍽️</option>
+                <option value="مشتريات طارئة">مشتريات طارئة 🚨</option>
+                <option value="أخرى">أخرى 📄</option>
+            </select>
+            <input type="text" id="expenseReason" placeholder="تفاصيل السبب بالتفصيل">
+            <input type="number" id="expenseAmount" placeholder="المبلغ المطلوب صرفه">
+            <button onclick="processExpense()" style="background-color: #fab387;">تأكيد الصرف</button>
+            
+            <!-- زر واتساب للإرسال السريع عند الصرف الخارجي أو انتهاء العهدة -->
+            <a id="whatsappBtn" href="#" target="_blank" class="btn-whatsapp">📲 إرسال الفاتورة للمدير عبر WhatsApp</a>
+            
+            <button class="logout-btn" onclick="logout()">تسجيل الخروج</button>
+        </div>
+
+        <hr style="border-color: #45475a; margin: 25px 0;">
+        <h2>سجل مصروفاتك الشخصية 📋</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>التصنيف</th>
+                    <th>البيان / السبب</th>
+                    <th>المبلغ</th>
+                    <th>التاريخ والوقت</th>
+                </tr>
+            </thead>
+            <tbody id="empTableBody"></tbody>
+            <tfoot id="empTableFoot"></tfoot>
+        </table>
+    </div>
+
+</div>
+
+<script>
+    let employees = [];
+    let currentEmpIndex = null;
+
+    function loadEmployees() {
+        employees = JSON.parse(localStorage.getItem('employees')) || [];
+    }
+
+    function login() {
+        loadEmployees();
+        const name = document.getElementById('loginName').value.trim();
+        const pass = document.getElementById('loginPass').value.trim();
+
+        const index = employees.findIndex(e => e.name === name && e.pass === pass);
+
+        if (index !== -1) {
+            currentEmpIndex = index;
+            document.getElementById('loginSection').classList.add('hidden');
+            document.getElementById('dashboardSection').classList.remove('hidden');
+            updateDashboard();
+        } else {
+            alert('اسم المستخدم أو كلمة المرور غير صحيحة!');
+        }
+    }
+
+    function updateDashboard() {
+        loadEmployees();
+        const emp = employees[currentEmpIndex];
+        document.getElementById('welcomeMessage').innerText = `مرحباً، ${emp.name} 👋`;
+        document.getElementById('currentBalance').innerText = `${emp.budget} نقطة`;
+        
+        if(emp.budget <= 0) {
+            document.getElementById('currentBalance').style.color = '#f38ba8';
+        } else {
+            document.getElementById('currentBalance').style.color = '#a6e3a1';
+        }
+
+        const tbody = document.getElementById('empTableBody');
+        const tfoot = document.getElementById('empTableFoot');
+        tbody.innerHTML = '';
+        tfoot.innerHTML = '';
+        
+        let totalSpent = 0;
+
+        if (!emp.expenses || emp.expenses.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#a6adc8;">لم تقم بتسجيل أي مصروفات بعد.</td></tr>';
+        } else {
+            emp.expenses.forEach(exp => {
+                totalSpent += exp.amount;
+                tbody.innerHTML += `
+                    <tr>
+                        <td><mark style="background:#45475a; color:#f9e2af; padding:2px 4px; border-radius:4px;">${exp.category || 'عام'}</mark></td>
+                        <td>${exp.reason}</td>
+                        <td style="color:#f38ba8; font-weight:bold;">${exp.amount} نقطة</td>
+                        <td><small>${exp.time}</small></td>
+                    </tr>
+                `;
+            });
+
+            tfoot.innerHTML = `
+                <tr class="total-row">
+                    <td colspan="2">إجمالي ما تم صرفه:</td>
+                    <td class="total-amount" colspan="2">${totalSpent} نقطة</td>
+                </tr>
+            `;
+        }
+    }
+
+    function processExpense() {
+        loadEmployees();
+        let emp = employees[currentEmpIndex];
+        const category = document.getElementById('expenseCategory').value;
+        const reason = document.getElementById('expenseReason').value.trim();
+        const amount = parseFloat(document.getElementById('expenseAmount').value);
+
+        if (!reason || isNaN(amount) || amount <= 0) {
+            alert('برجاء إدخال تفاصيل الصرف والمبلغ بشكل صحيح.');
+            return;
+        }
+
+        if(!emp.expenses) emp.expenses = [];
+
+        let notifications = JSON.parse(localStorage.getItem('notifications')) || [];
+        let timeNow = new Date().toLocaleString('ar-EG');
+
+        emp.expenses.unshift({ category: category, reason: reason, amount: amount, time: timeNow });
+
+        let waMessage = "";
+
+        if (emp.budget <= 0) {
+            emp.budget -= amount;
+            waMessage = `🚨 طلب تعويض مالي عاجل\nالموظف: ${emp.name}\nصرف من جيبه مبلغ: ${amount} نقطة\nالبند: ${category}\nالسبب: ${reason}\nالوقت: ${timeNow}\nيرجى تحويل المبلغ لتجديد الرصيد.`;
+            notifications.unshift({
+                type: 'overdraft',
+                text: `🚨 تنبيه: الموظف [${emp.name}] قام بدفع مبلغ وقدره (${amount}) من حسابه الشخصي لبند [${category}] لغرض: ${reason}. يرجى تحويل المبلغ له.`,
+                time: timeNow
+            });
+            alert('تم تسجيل المبلغ بالسالب وإرسال طلب تعويض للشركة لمراجعته.');
+        } 
+        else {
+            if (amount > emp.budget) {
+                let remainingFromPocket = amount - emp.budget;
+                emp.budget = 0;
+                waMessage = `⚠️ انتهت العُهدة وصرف زيادة\nالموظف: ${emp.name}\nالرصيد خلص، وصرف مديونية من جيبه بقيمة: ${remainingFromPocket} نقطة\nالبند: ${category}\nالسبب: ${reason}`;
+                notifications.unshift({
+                    type: 'finished',
+                    text: `⚠️ انتهت عُهدة الموظف [${emp.name}]. وصرف زيادة من جيبه بقيمة (${remainingFromPocket}) لبند [${category}] لغرض: ${reason}. يرجى تحويل الزيادة.`,
+                    time: timeNow
+                });
+                alert('تم استهلاك كامل الرصيد، وتم إشعار الشركة بالزيادة المصروفة.');
+            } else {
+                emp.budget -= amount;
+                if (emp.budget === 0) {
+                    notifications.unshift({
+                        type: 'finished',
+                        text: `🔔 الموظف [${emp.name}] استهلك عُهدته بالكامل الآن في بند [${category}].`,
+                        time: timeNow
+                    });
+                    alert('تم الصرف، ورصيدك الآن أصبح صفر وتم إشعار الشركة.');
+                } else {
+                    alert('تم الصرف بنجاح وتحديث الرصيد المتبقي.');
+                }
+            }
+        }
+
+        employees[currentEmpIndex] = emp;
+        localStorage.setItem('employees', JSON.stringify(employees));
+        localStorage.setItem('notifications', JSON.stringify(notifications));
+
+        // تفعيل زر الواتساب وتجهيز الرسالة لو فيه مديونية أو الرصيد خلص
+        if(waMessage !== "") {
+            const encodedMessage = encodeURIComponent(waMessage);
+            const whatsappBtn = document.getElementById('whatsappBtn');
+            whatsappBtn.href = `https://wa.me/?text=${encodedMessage}`;
+            whatsappBtn.style.display = 'block';
+        } else {
+            document.getElementById('whatsappBtn').style.display = 'none';
+        }
+
+        document.getElementById('expenseReason').value = '';
+        document.getElementById('expenseAmount').value = '';
+        updateDashboard();
+    }
+
+    function logout() {
+        currentEmpIndex = null;
+        document.getElementById('loginName').value = '';
+        document.getElementById('loginPass').value = '';
+        document.getElementById('whatsappBtn').style.display = 'none';
+        document.getElementById('dashboardSection').classList.add('hidden');
+        document.getElementById('loginSection').classList.remove('hidden');
+    }
+
+    window.addEventListener('storage', () => {
+        if (currentEmpIndex !== null) updateDashboard();
+    });
+</script>
+</body>
+</html>
